@@ -1,0 +1,103 @@
+name: Yakateam CI Auto-Build
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Upstream
+        uses: actions/checkout@v4
+        with:
+          repository: 'Yakateam/kotatsu-parsers'
+          path: 'upstream'
+          
+      - name: Checkout Deploy Branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'repo'
+          path: 'deploy'
+          continue-on-error: true
+
+      - name: Checkout Kototoro Compilation Engine
+        uses: actions/checkout@v4
+        with:
+          repository: 'skepsun/kototoro-parsers'
+          path: 'builder'
+
+      - name: Poll Upstream Delta
+        id: check_update
+        run: |
+          cd upstream
+          UPSTREAM_COMMIT=$(git rev-parse HEAD)
+          echo "Upstream target: $UPSTREAM_COMMIT"
+          cd ../deploy || mkdir -p ../deploy
+          if [ -f "upstream_commit.txt" ]; then
+            LAST_COMMIT=$(cat upstream_commit.txt)
+            if [ "$UPSTREAM_COMMIT" == "$LAST_COMMIT" ]; then
+              echo "has_update=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "has_update=true" >> $GITHUB_OUTPUT
+          echo "UPSTREAM_COMMIT=$UPSTREAM_COMMIT" >> "$GITHUB_ENV"
+
+      - name: JDK 17
+        if: steps.check_update.outputs.has_update == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Transplant Parsers and Build Standard JAR
+        if: steps.check_update.outputs.has_update == 'true'
+        run: |
+          # Transplant Yakateam code into the builder engine
+          rm -rf builder/src/main/kotlin/org/koitharu/kotatsu/parsers/
+          cp -R upstream/src/main/kotlin/org/koitharu/kotatsu/parsers/ builder/src/main/kotlin/org/koitharu/kotatsu/parsers/
+          rm -rf builder/src/main/assets/
+          cp -R upstream/src/main/assets/ builder/src/main/assets/ || true
+          
+          cd builder
+          chmod +x ./gradlew
+          ./gradlew jar --no-daemon
+        
+      - name: D8 Dex Engine Packaging
+        if: steps.check_update.outputs.has_update == 'true'
+        run: |
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          D8_PATH="$BUILD_TOOLS_DIR/d8"
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          cd builder/build/libs
+          JAR_FILE=$(ls *.jar | head -n 1)
+          $D8_PATH --release --lib $ANDROID_JAR --output . $JAR_FILE
+          jar cvf plugin.jar classes.dex
+          mkdir -p ../../../deploy_new/apk
+          cp plugin.jar ../../../deploy_new/apk/
+
+          cat << 'EOF' > ../../../deploy_new/index.min.json
+          [
+            {
+              "name": "Yakateam Kotatsu Parsers",
+              "pkg": "org.skepsun.kototoro.parsers.yakateam",
+              "version": "1.0.${{ github.run_number }}",
+              "code": ${{ github.run_number }},
+              "apk": "apk/plugin.jar",
+              "lang": "all",
+              "nsfw": 1
+            }
+          ]
+          EOF
+          echo "${{ env.UPSTREAM_COMMIT }}" > ../../../deploy_new/upstream_commit.txt
+
+      - name: Push to Repo Deploy Branch
+        if: steps.check_update.outputs.has_update == 'true'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy_new
+          publish_branch: repo
+          force_orphan: true
