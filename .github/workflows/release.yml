@@ -36,6 +36,13 @@ jobs:
           echo "has_update=true" >> $GITHUB_OUTPUT
           echo "UPSTREAM_COMMIT=$UPSTREAM_COMMIT" >> "$GITHUB_ENV"
 
+      - name: JDK 17
+        if: steps.check_update.outputs.has_update == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
       - name: Build Standard JAR
         if: steps.check_update.outputs.has_update == 'true'
         run: |
