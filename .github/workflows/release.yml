@@ -85,7 +85,7 @@ jobs:
               "pkg": "org.skepsun.kototoro.parsers.yakateam",
               "version": "1.0.${{ github.run_number }}",
               "code": ${{ github.run_number }},
-              "apk": "apk/plugin.jar",
+              "apk": "plugin.jar",
               "lang": "all",
               "nsfw": 1
             }
