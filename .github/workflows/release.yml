@@ -36,30 +36,10 @@ jobs:
           echo "has_update=true" >> $GITHUB_OUTPUT
           echo "UPSTREAM_COMMIT=$UPSTREAM_COMMIT" >> "$GITHUB_ENV"
 
-      - name: Checkout Kototoro Compilation Engine
-        if: steps.check_update.outputs.has_update == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: 'skepsun/kototoro-parsers'
-          path: 'builder'
-
-      - name: JDK 17
-        if: steps.check_update.outputs.has_update == 'true'
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          
-      - name: Transplant Parsers and Build Standard JAR
+      - name: Build Standard JAR
         if: steps.check_update.outputs.has_update == 'true'
         run: |
-          # Transplant Yakateam code into the builder engine
-          rm -rf builder/src/main/kotlin/org/koitharu/kotatsu/parsers/
-          cp -R upstream/src/main/kotlin/org/koitharu/kotatsu/parsers/ builder/src/main/kotlin/org/koitharu/kotatsu/parsers/
-          rm -rf builder/src/main/assets/
-          cp -R upstream/src/main/assets/ builder/src/main/assets/ || true
-          
-          cd builder
+          cd upstream
           chmod +x ./gradlew
           ./gradlew jar --no-daemon
         
@@ -69,7 +49,7 @@ jobs:
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
           D8_PATH="$BUILD_TOOLS_DIR/d8"
           ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
-          cd builder/build/libs
+          cd upstream/build/libs
           JAR_FILE=$(ls *.jar | head -n 1)
           $D8_PATH --release --lib $ANDROID_JAR --output . $JAR_FILE
           jar cvf plugin.jar classes.dex
