@@ -50,6 +50,8 @@ jobs:
         if: steps.check_update.outputs.has_update == 'true'
         run: |
           cd upstream
+          # Bytecode compatibility patch for Kototoro Native JVM Host
+          sed -i 's/public val source: MangaParserSource/public val source: MangaSource/g' parser-api/src/main/kotlin/org/koitharu/kotatsu/parsers/MangaParser.kt
           chmod +x ./gradlew
           ./gradlew jar --no-daemon
         
