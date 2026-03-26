@@ -17,10 +17,10 @@ jobs:
           
       - name: Checkout Deploy Branch
         uses: actions/checkout@v4
+        continue-on-error: true
         with:
           ref: 'repo'
           path: 'deploy'
-          continue-on-error: true
 
       - name: Checkout Kototoro Compilation Engine
         uses: actions/checkout@v4
