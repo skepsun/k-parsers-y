@@ -29,7 +29,9 @@ jobs:
           mkdir -p deploy
           curl -s -f https://raw.githubusercontent.com/${{ github.repository }}/repo/upstream_commit.txt > deploy/upstream_commit.txt || echo "No existing deployment found on remote."
           
-          if [ -s "deploy/upstream_commit.txt" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Manual trigger detected, forcing rebuild."
+          elif [ -s "deploy/upstream_commit.txt" ]; then
             LAST_COMMIT=$(cat deploy/upstream_commit.txt)
             if [ "$UPSTREAM_COMMIT" == "$LAST_COMMIT" ]; then
               echo "has_update=false" >> $GITHUB_OUTPUT
