@@ -15,28 +15,19 @@ jobs:
           repository: 'Yakateam/kotatsu-parsers'
           path: 'upstream'
           
-      - name: Checkout Deploy Branch
-        uses: actions/checkout@v4
-        continue-on-error: true
-        with:
-          ref: 'repo'
-          path: 'deploy'
-
-      - name: Checkout Kototoro Compilation Engine
-        uses: actions/checkout@v4
-        with:
-          repository: 'skepsun/kototoro-parsers'
-          path: 'builder'
-
       - name: Poll Upstream Delta
         id: check_update
         run: |
           cd upstream
           UPSTREAM_COMMIT=$(git rev-parse HEAD)
           echo "Upstream target: $UPSTREAM_COMMIT"
-          cd ../deploy || mkdir -p ../deploy
-          if [ -f "upstream_commit.txt" ]; then
-            LAST_COMMIT=$(cat upstream_commit.txt)
+          cd ..
+          
+          mkdir -p deploy
+          curl -s -f https://raw.githubusercontent.com/${{ github.repository }}/repo/upstream_commit.txt > deploy/upstream_commit.txt || echo "No existing deployment found on remote."
+          
+          if [ -s "deploy/upstream_commit.txt" ]; then
+            LAST_COMMIT=$(cat deploy/upstream_commit.txt)
             if [ "$UPSTREAM_COMMIT" == "$LAST_COMMIT" ]; then
               echo "has_update=false" >> $GITHUB_OUTPUT
               exit 0
@@ -44,6 +35,13 @@ jobs:
           fi
           echo "has_update=true" >> $GITHUB_OUTPUT
           echo "UPSTREAM_COMMIT=$UPSTREAM_COMMIT" >> "$GITHUB_ENV"
+
+      - name: Checkout Kototoro Compilation Engine
+        if: steps.check_update.outputs.has_update == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: 'skepsun/kototoro-parsers'
+          path: 'builder'
 
       - name: JDK 17
         if: steps.check_update.outputs.has_update == 'true'
